@@ -52,9 +52,9 @@ private fun NumberField(
 }
 
 @Composable
-fun BodyScreen(date: LocalDate, day: DayRecord, onBack: () -> Unit, save: (DayRecord) -> Unit) {
+fun BodyScreen(date: LocalDate, day: DayRecord, previousHeight: Double?, onBack: () -> Unit, save: (DayRecord) -> Unit) {
     val context = LocalContext.current
-    var height by remember(date, day) { mutableStateOf(cleanNumber(day.heightCm)) }
+    var height by remember(date, day, previousHeight) { mutableStateOf(cleanNumber(day.heightCm ?: previousHeight)) }
     var weight by remember(date, day) { mutableStateOf(cleanNumber(day.weightKg)) }
     var systolic by remember(date, day) { mutableStateOf(day.systolic?.toString().orEmpty()) }
     var diastolic by remember(date, day) { mutableStateOf(day.diastolic?.toString().orEmpty()) }
@@ -64,6 +64,9 @@ fun BodyScreen(date: LocalDate, day: DayRecord, onBack: () -> Unit, save: (DayRe
     PageColumn("身体数据", date, onBack = onBack) {
         Spacer(Modifier.height(12.dp))
         NumberField("身高", height, { height = it }, "cm")
+        if (day.heightCm == null && previousHeight != null) {
+            SmallLabel("已预填最近一次历史身高，保存后记入本日；可手动修改。", DarkGreen)
+        }
         Spacer(Modifier.height(10.dp))
         NumberField("体重", weight, { weight = it }, "kg")
         Spacer(Modifier.height(10.dp))

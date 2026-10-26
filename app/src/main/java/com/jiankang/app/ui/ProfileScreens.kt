@@ -56,7 +56,9 @@ fun ProfileScreen(date: LocalDate, settings: AppSettings, go: (Page) -> Unit) {
             HorizontalDivider(color = Line)
             SettingRow(Icons.Outlined.DirectionsRun, "运动类型") { go(Page.SPORTS) }
             HorizontalDivider(color = Line)
-            SettingRow(Icons.Outlined.NotificationsNone, "提醒设置", subtitle = "记录提醒、睡觉提醒等") { go(Page.REMINDERS) }
+            SettingRow(Icons.Outlined.NotificationsNone, "提醒设置", subtitle = "每日记录提醒") { go(Page.REMINDERS) }
+            HorizontalDivider(color = Line)
+            SettingRow(Icons.Outlined.PhoneAndroid, "手机使用时间", subtitle = "每日限额、提醒和系统专注模式") { go(Page.SCREEN_TIME) }
             HorizontalDivider(color = Line)
             SettingRow(Icons.Outlined.FileDownload, "数据备份与导出") { go(Page.BACKUP) }
             HorizontalDivider(color = Line)
@@ -64,6 +66,8 @@ fun ProfileScreen(date: LocalDate, settings: AppSettings, go: (Page) -> Unit) {
         }
         AppCard {
             SettingRow(Icons.Outlined.Spa, "营养建议", subtitle = "地中海饮食原则与今日评分") { go(Page.DIET) }
+            HorizontalDivider(color = Line)
+            SettingRow(Icons.Outlined.FavoriteBorder, "疾病预防知识", subtitle = "心脑血管、癌症预防与就医知识") { go(Page.HEALTH_GUIDE) }
         }
         SmallLabel("健康日记 · 所有测量数据仅存放在本机")
     }

@@ -40,7 +40,7 @@ fun MealScreen(
         mutableStateListOf<MealEntry>().apply { addAll(db.meals(date.toString(), meal)) }
     }
     var search by remember(date, meal) { mutableStateOf("") }
-    var favoritesMode by remember(date, meal) { mutableStateOf(false) }
+    var foodCategory by remember(date, meal) { mutableStateOf("recommended") }
     var favorites by remember { mutableStateOf(settings.favorites()) }
     var editingIndex by remember { mutableIntStateOf(-1) }
     var customDialog by remember { mutableStateOf(false) }
@@ -55,8 +55,11 @@ fun MealScreen(
         }
     }
     val allOptions = FoodCatalog.all + savedCustom
-    val shown = if (favoritesMode) allOptions.filter { it.name in favorites }
-        else FoodCatalog.recommended(meal)
+    val shown = when (foodCategory) {
+        "favorite" -> allOptions.filter { it.name in favorites }
+        "chinese" -> FoodCatalog.localBreakfast()
+        else -> FoodCatalog.recommended(meal)
+    }
     val filtered = if (search.isBlank()) shown else allOptions.filter {
         it.name.contains(search.trim(), ignoreCase = true)
     }.distinctBy { it.name }
@@ -76,12 +79,15 @@ fun MealScreen(
             )
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            FilterPill("推荐（地中海饮食）", !favoritesMode, Modifier.weight(1f)) { favoritesMode = false; search = "" }
-            FilterPill("我的常用", favoritesMode, Modifier.weight(1f)) { favoritesMode = true; search = "" }
+            FilterPill("地中海饮食", foodCategory == "recommended", Modifier.weight(1f)) { foodCategory = "recommended"; search = "" }
+            if (meal == MealType.BREAKFAST) {
+                FilterPill("家常早餐", foodCategory == "chinese", Modifier.weight(1f)) { foodCategory = "chinese"; search = "" }
+            }
+            FilterPill("我的常用", foodCategory == "favorite", Modifier.weight(1f)) { foodCategory = "favorite"; search = "" }
         }
         if (filtered.isEmpty()) {
             AppCard {
-                Text(if (favoritesMode) "暂无常用食物，可先从推荐食物中收藏。" else "没找到对应食物，可添加自定义食物。", color = Slate)
+                Text(if (foodCategory == "favorite" && search.isBlank()) "暂无常用食物，可先从推荐食物中收藏。" else "没找到对应食物，可添加自定义食物。", color = Slate)
             }
         } else {
             filtered.chunked(3).forEach { group ->
@@ -149,7 +155,7 @@ fun MealScreen(
                 Text("保存", color = Color.White)
             }
         }
-        SmallLabel("食物热量按常见食品近似计算，请按实际份量调整；此处不构成营养处方。")
+        SmallLabel("热量按常见做法估算；鸡蛋灌饼、小笼包等用油、馅料和份量差异很大，请据实调整。")
     }
 
     if (editingIndex in selected.indices) {

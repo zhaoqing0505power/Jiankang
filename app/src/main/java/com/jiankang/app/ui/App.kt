@@ -10,15 +10,17 @@ import com.jiankang.app.data.AppSettings
 import com.jiankang.app.data.HealthDatabase
 import com.jiankang.app.model.MealType
 import java.time.LocalDate
+import com.jiankang.app.screentime.ScreenTimeReader
+import com.jiankang.app.screentime.ScreenLimitScheduler
 
 enum class Page(val isTab: Boolean = false) {
     HOME(true), RECORD(true), STATS(true), PROFILE(true),
-    BODY, BREAKFAST, LUNCH, DINNER, SLEEP, EXERCISE, DIET,
-    GOALS, FAVORITES, SPORTS, REMINDERS, BACKUP, ABOUT
+    BODY, BREAKFAST, LUNCH, DINNER, SLEEP, EXERCISE, REFLECTION, DIET,
+    SCREEN_TIME, HEALTH_GUIDE, GOALS, FAVORITES, SPORTS, REMINDERS, BACKUP, ABOUT
 }
 
 @Composable
-fun HealthApp() {
+fun HealthApp(resumeToken: Int = 0) {
     val context = LocalContext.current
     val db = remember { HealthDatabase(context.applicationContext) }
     val settings = remember { AppSettings(context.applicationContext) }
@@ -29,6 +31,11 @@ fun HealthApp() {
     val date = LocalDate.parse(dayString)
     val day = remember(dayString, revision) { db.day(dayString) }
     val meals = remember(dayString, revision) { db.meals(dayString) }
+    val previousHeight = remember(dayString, revision) { db.latestHeightBefore(dayString) }
+    val screenUsage = remember(dayString, page, resumeToken) {
+        ScreenTimeReader.read(context.applicationContext, date)
+    }
+    LaunchedEffect(resumeToken) { ScreenLimitScheduler.maybeNotify(context.applicationContext, settings) }
 
     val navigate: (Page) -> Unit = { dest ->
         if (page != dest) {
@@ -65,16 +72,19 @@ fun HealthApp() {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (page) {
-                Page.HOME -> HomeScreen(date, day, meals, settings.sleepGoalHours, chooseDate, navigate)
+                Page.HOME -> HomeScreen(date, day, meals, settings.sleepGoalHours, previousHeight, screenUsage, settings, chooseDate, navigate)
                 Page.RECORD -> RecordScreen(date, day, meals, chooseDate, navigate)
-                Page.BODY -> BodyScreen(date, day, back, savedDay)
+                Page.BODY -> BodyScreen(date, day, previousHeight, back, savedDay)
                 Page.BREAKFAST -> MealScreen(date, MealType.BREAKFAST, db, settings, back, savedMeal)
                 Page.LUNCH -> MealScreen(date, MealType.LUNCH, db, settings, back, savedMeal)
                 Page.DINNER -> MealScreen(date, MealType.DINNER, db, settings, back, savedMeal)
                 Page.SLEEP -> SleepScreen(date, day, settings.sleepGoalHours, back, savedDay)
                 Page.EXERCISE -> ExerciseScreen(date, day, back, savedDay)
+                Page.REFLECTION -> ReflectionScreen(date, day, back, savedDay)
                 Page.STATS -> StatsScreen(date, db, revision)
                 Page.DIET -> DietScreen(date, meals, back)
+                Page.HEALTH_GUIDE -> HealthGuideScreen(date, back)
+                Page.SCREEN_TIME -> ScreenTimeScreen(date, screenUsage, settings, back, settingsUpdated)
                 Page.PROFILE -> ProfileScreen(date, settings, navigate)
                 Page.GOALS -> GoalsScreen(settings, back) { revision++; back() }
                 Page.FAVORITES -> FavoritesScreen(db, settings, back, navigate)

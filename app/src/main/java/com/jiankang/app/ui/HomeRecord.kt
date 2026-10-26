@@ -24,6 +24,8 @@ import com.jiankang.app.model.DayRecord
 import com.jiankang.app.model.HealthMath
 import com.jiankang.app.model.MealEntry
 import com.jiankang.app.model.MealType
+import com.jiankang.app.data.AppSettings
+import com.jiankang.app.screentime.ScreenUsage
 import java.time.LocalDate
 import java.util.Locale
 
@@ -33,15 +35,17 @@ private fun present(value: Double?): String =
 @Composable
 fun HomeScreen(
     date: LocalDate, day: DayRecord, meals: List<MealEntry>,
-    sleepGoal: Int, onDate: () -> Unit, go: (Page) -> Unit
+    sleepGoal: Int, previousHeight: Double?, screenUsage: ScreenUsage?, settings: AppSettings,
+    onDate: () -> Unit, go: (Page) -> Unit
 ) {
     val mealsDone = MealType.entries.count { meal -> meals.any { it.meal == meal.code } }
     val bodyDone = day.heightCm != null || day.weightKg != null || day.systolic != null || day.diastolic != null
     val sleep = HealthMath.sleepMinutes(day.sleepStart, day.sleepEnd)
     val exerciseDone = day.exerciseMinutes != null && day.exerciseMinutes > 0
+    val reflectionDone = !day.reflection.isNullOrBlank() || !day.mood.isNullOrBlank()
     val finished = mealsDone + (if (bodyDone) 1 else 0) + (if (sleep != null) 1 else 0) +
-        (if (exerciseDone) 1 else 0)
-    val progress = finished / 6f
+        (if (exerciseDone) 1 else 0) + (if (reflectionDone) 1 else 0)
+    val progress = finished / 7f
     PageColumn("今天", date, onDate = onDate) {
         Box(Modifier.fillMaxWidth().height(208.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(172.dp)) {
@@ -65,7 +69,7 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MetricValue("身高", if (day.heightCm == null) "--" else present(day.heightCm) + " cm", Modifier.weight(1f))
+                MetricValue("身高", if (day.heightCm == null && previousHeight == null) "--" else present(day.heightCm ?: previousHeight) + " cm", Modifier.weight(1f))
                 MetricValue("体重", if (day.weightKg == null) "--" else present(day.weightKg) + " kg", Modifier.weight(1f))
                 MetricValue(
                     "血压", if (day.systolic == null || day.diastolic == null) "--"
@@ -114,6 +118,23 @@ fun HomeScreen(
             Spacer(Modifier.height(10.dp))
             ProgressTrack((day.exerciseMinutes ?: 0) / 30f, Green)
         }
+        if (reflectionDone) {
+            AppCard(modifier = Modifier.clickable { go(Page.REFLECTION) }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ColorIcon(Icons.Default.AutoStories, Violet)
+                    Spacer(Modifier.width(12.dp))
+                    Text("今日感悟", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text(day.mood ?: "已记录", color = Violet, fontSize = 12.sp)
+                }
+                if (!day.reflection.isNullOrBlank()) {
+                    Spacer(Modifier.height(7.dp))
+                    Text(day.reflection.take(70), color = Slate, fontSize = 12.sp, maxLines = 2)
+                }
+            }
+        }
+        DailyQuoteCard(date)
+        DailyHealthCard(date) { go(Page.HEALTH_GUIDE) }
+        ScreenTimeSummaryCard(date, screenUsage, settings) { go(Page.SCREEN_TIME) }
     }
 }
 
@@ -145,6 +166,10 @@ fun RecordScreen(date: LocalDate, day: DayRecord, meals: List<MealEntry>,
             Icons.Default.DirectionsRun, Color(0xFF27C96A), "运动", "运动时间与消耗千卡",
             day.exerciseMinutes != null && day.exerciseMinutes > 0
         ) { go(Page.EXERCISE) }
+        RecordTile(
+            Icons.Default.AutoStories, Violet, "感悟", "记录今天的心情和生活体会",
+            !day.reflection.isNullOrBlank() || !day.mood.isNullOrBlank()
+        ) { go(Page.REFLECTION) }
         Spacer(Modifier.height(4.dp))
         Text("点开卡片填写，可补记其他日期。每条记录自动保存在本机。", fontSize = 12.sp, color = Slate)
     }
