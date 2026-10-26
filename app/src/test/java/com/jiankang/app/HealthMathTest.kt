@@ -19,7 +19,7 @@ class HealthMathTest {
         assertNull(HealthMath.bmi(0.0, 65.2))
     }
     @Test fun calorieEstimateUsesMeasuredWeight() {
-        assertEquals(120, HealthMath.exerciseKcal("快走", 30, 65.0)!!, 5)
+        assertEquals(120.0, HealthMath.exerciseKcal("快走", 30, 65.0)!!.toDouble(), 5.0)
         assertNull(HealthMath.exerciseKcal("快走", 30, null))
     }
     @Test fun emptyMealsAreNotGivenFakeDietScore() {
