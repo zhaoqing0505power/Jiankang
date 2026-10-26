@@ -11,6 +11,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.media.AudioAttributes
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -106,9 +108,18 @@ object WorkdayBreakReminder {
                 (context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator)
             }
             if (vibrator.hasVibrator()) {
-                vibrator.vibrate(VibrationEffect.createWaveform(
+                val effect = VibrationEffect.createWaveform(
                     longArrayOf(0L, 230L, 120L, 230L), -1
-                ))
+                )
+                // Background broadcasts need NOTIFICATION usage on Android.
+                if (Build.VERSION.SDK_INT >= 33) {
+                    vibrator.vibrate(effect,
+                        VibrationAttributes.createForUsage(VibrationAttributes.USAGE_NOTIFICATION))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(effect, AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
+                }
             }
         } catch (_: Exception) {
             // Some hardware has no vibrator or restricts background vibration.
