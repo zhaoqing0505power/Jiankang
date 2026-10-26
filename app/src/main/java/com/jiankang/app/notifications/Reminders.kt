@@ -14,6 +14,7 @@ import android.os.Build
 import com.jiankang.app.MainActivity
 import com.jiankang.app.R
 import com.jiankang.app.data.AppSettings
+import com.jiankang.app.screentime.ScreenLimitScheduler
 import java.util.Calendar
 
 object ReminderScheduler {
@@ -67,7 +68,9 @@ class ReminderReceiver : BroadcastReceiver() {
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action == Intent.ACTION_BOOT_COMPLETED) {
-            ReminderScheduler.schedule(context, AppSettings(context))
+            val settings = AppSettings(context)
+            ReminderScheduler.schedule(context, settings)
+            ScreenLimitScheduler.schedule(context, settings)
         }
     }
 }
