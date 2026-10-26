@@ -25,6 +25,31 @@ class AppSettings(context: Context) {
         get() = prefs.getInt("reminder_minute", 0)
         set(value) { prefs.edit().putInt("reminder_minute", value.coerceIn(0, 59)).apply() }
 
+    /** Total interactive screen-time goal, in minutes, default five hours. */
+    var screenGoalMinutes: Int
+        get() = prefs.getInt("screen_goal_minutes", 300)
+        set(value) { prefs.edit().putInt("screen_goal_minutes", value.coerceIn(30, 1440)).apply() }
+
+    var screenAlertEnabled: Boolean
+        get() = prefs.getBoolean("screen_alert", false)
+        set(value) { prefs.edit().putBoolean("screen_alert", value).apply() }
+
+    /** remind = notifications only; focus = reminders + system Digital Wellbeing guide. */
+    var screenLimitMode: String
+        get() = prefs.getString("screen_mode", "focus") ?: "focus"
+        set(value) {
+            require(value == "remind" || value == "focus")
+            prefs.edit().putString("screen_mode", value).apply()
+        }
+
+    /** Return true just once for each warning tier on each calendar date. */
+    fun markScreenAlertOnce(date: String, threshold: Int): Boolean {
+        require(threshold == 80 || threshold == 100)
+        val key = "screen_warn_" + threshold
+        if (prefs.getString(key, null) == date) return false
+        return prefs.edit().putString(key, date).commit()
+    }
+
     fun favorites(): Set<String> = prefs.getStringSet("favorites", emptySet())?.toSet().orEmpty()
 
     fun toggleFavorite(name: String) {

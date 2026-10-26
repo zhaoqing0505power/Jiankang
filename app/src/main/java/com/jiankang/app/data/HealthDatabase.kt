@@ -13,14 +13,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
 
-class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db", null, 1) {
+class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db", null, 2) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """CREATE TABLE days (
                 date TEXT PRIMARY KEY NOT NULL,
                 height_cm REAL, weight_kg REAL, systolic INTEGER, diastolic INTEGER,
                 sleep_start TEXT, sleep_end TEXT, exercise_type TEXT,
-                exercise_minutes INTEGER, exercise_calories INTEGER, calories_estimated INTEGER NOT NULL DEFAULT 0
+                exercise_minutes INTEGER, exercise_calories INTEGER, calories_estimated INTEGER NOT NULL DEFAULT 0,
+                reflection TEXT, mood TEXT
             )"""
         )
         db.execSQL(
@@ -34,7 +35,19 @@ class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db"
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Explicit migrations are required when the schema version is increased.
+        // Keep existing records on upgrade from v1. Never drop the user's diary.
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE days ADD COLUMN reflection TEXT")
+            db.execSQL("ALTER TABLE days ADD COLUMN mood TEXT")
+        }
+    }
+
+    fun latestHeightBefore(date: String): Double? {
+        LocalDate.parse(date)
+        readableDatabase.query(
+            "days", arrayOf("height_cm"), "date < ? AND height_cm IS NOT NULL",
+            arrayOf(date), null, null, "date DESC", "1"
+        ).use { c -> return if (c.moveToFirst()) c.getDouble(0) else null }
     }
 
     fun day(date: String): DayRecord {
@@ -82,7 +95,9 @@ class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db"
         exerciseType = c.nullString("exercise_type"),
         exerciseMinutes = c.nullInt("exercise_minutes"),
         exerciseCalories = c.nullInt("exercise_calories"),
-        caloriesEstimated = c.getInt(c.getColumnIndexOrThrow("calories_estimated")) != 0
+        caloriesEstimated = c.getInt(c.getColumnIndexOrThrow("calories_estimated")) != 0,
+        reflection = c.nullString("reflection"),
+        mood = c.nullString("mood")
     )
 
     fun saveDay(record: DayRecord) = putDay(writableDatabase, record)
@@ -101,6 +116,8 @@ class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db"
             record.exerciseMinutes?.let { put("exercise_minutes", it) } ?: putNull("exercise_minutes")
             record.exerciseCalories?.let { put("exercise_calories", it) } ?: putNull("exercise_calories")
             put("calories_estimated", if (record.caloriesEstimated) 1 else 0)
+            record.reflection?.let { put("reflection", it) } ?: putNull("reflection")
+            record.mood?.let { put("mood", it) } ?: putNull("mood")
         }
         db.insertWithOnConflict("days", null, values, SQLiteDatabase.CONFLICT_REPLACE)
     }
@@ -161,7 +178,7 @@ class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db"
     }
 
     fun exportJson(): String {
-        val result = JSONObject().put("format", "Jiankang").put("version", 1)
+        val result = JSONObject().put("format", "Jiankang").put("version", 2)
         val dayArray = JSONArray()
         allDays().forEach { r -> dayArray.put(JSONObject().apply {
             put("date", r.date); put("heightCm", r.heightCm); put("weightKg", r.weightKg)
@@ -169,6 +186,7 @@ class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db"
             put("sleepStart", r.sleepStart); put("sleepEnd", r.sleepEnd)
             put("exerciseType", r.exerciseType); put("exerciseMinutes", r.exerciseMinutes)
             put("exerciseCalories", r.exerciseCalories); put("caloriesEstimated", r.caloriesEstimated)
+            put("reflection", r.reflection); put("mood", r.mood)
         }) }
         val mealArray = JSONArray()
         allMeals().forEach { r -> mealArray.put(JSONObject().apply {
@@ -190,7 +208,7 @@ class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db"
     fun importJson(text: String) {
         require(text.length <= 12_000_000) { "备份文件过大" }
         val root = JSONObject(text)
-        require(root.optString("format") == "Jiankang" && root.optInt("version") == 1) { "备份格式不受支持" }
+        require(root.optString("format") == "Jiankang" && root.optInt("version") in 1..2) { "备份格式不受支持" }
         val dayArray = root.getJSONArray("days")
         val mealArray = root.getJSONArray("meals")
         require(dayArray.length() <= 100_000 && mealArray.length() <= 1_000_000) { "记录数量超出限制" }
@@ -208,9 +226,11 @@ class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db"
                     sleepEnd = o.stringOrNull("sleepEnd"), exerciseType = o.stringOrNull("exerciseType"),
                     exerciseMinutes = o.intOrNull("exerciseMinutes"),
                     exerciseCalories = o.intOrNull("exerciseCalories"),
-                    caloriesEstimated = o.optBoolean("caloriesEstimated", false)
+                    caloriesEstimated = o.optBoolean("caloriesEstimated", false),
+                    reflection = o.stringOrNull("reflection"), mood = o.stringOrNull("mood")
                 )
                 require(r.sleepStart == null || HealthMath.sleepMinutes(r.sleepStart, r.sleepEnd) != null)
+                require((r.reflection?.length ?: 0) <= 8000 && (r.mood?.length ?: 0) <= 30)
                 putDay(db, r)
             }
             for (i in 0 until mealArray.length()) {
@@ -227,8 +247,13 @@ class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db"
     }
 
     fun exportCsv(): String {
-        fun esc(raw: String): String = "\"" + raw.replace("\"", "\"\"") + "\""
-        val header = "日期,身高(cm),体重(kg),收缩压(mmHg),舒张压(mmHg),睡眠开始,睡眠结束,睡眠分钟,运动类型,运动分钟,运动大卡,早餐,午餐,晚餐"
+        // Protect spreadsheet users against formula injection from custom food names/diary text.
+        fun esc(raw: String): String {
+            val trimmed = raw.trimStart()
+            val safe = if (trimmed.startsWith("=") || trimmed.startsWith("+") || trimmed.startsWith("-") || trimmed.startsWith("@")) "\'" + raw else raw
+            return "\"" + safe.replace("\"", "\"\"") + "\""
+        }
+        val header = "日期,身高(cm),体重(kg),收缩压(mmHg),舒张压(mmHg),睡眠开始,睡眠结束,睡眠分钟,运动类型,运动分钟,运动大卡,早餐,午餐,晚餐,心情,感悟"
         val grouped = allMeals().groupBy { it.date to it.meal }
         val rows = allDays().map { d ->
             val vals = listOf(
@@ -242,7 +267,7 @@ class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db"
                 grouped[d.date to type.code].orEmpty().joinToString("；") {
                     it.name + "(" + it.grams + "g/" + it.calories + "kcal)"
                 }
-            }
+            } + listOf(d.mood.orEmpty(), d.reflection.orEmpty())
             vals.joinToString(",") { esc(it) }
         }
         return "\uFEFF" + (listOf(header) + rows).joinToString("\r\n")

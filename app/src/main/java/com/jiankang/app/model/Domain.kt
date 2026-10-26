@@ -20,7 +20,9 @@ data class DayRecord(
     val exerciseType: String? = null,
     val exerciseMinutes: Int? = null,
     val exerciseCalories: Int? = null,
-    val caloriesEstimated: Boolean = false
+    val caloriesEstimated: Boolean = false,
+    val reflection: String? = null,
+    val mood: String? = null
 )
 
 data class MealEntry(
@@ -71,8 +73,17 @@ object FoodCatalog {
         FoodOption("加工肉", "🥓", "processed", 320, 70),
         FoodOption("甜饮料", "🥤", "sugar", 42, 250),
         FoodOption("精制糕点", "🍰", "sugar", 360, 80),
-        FoodOption("肥肉", "🍖", "processed", 395, 100)
+        FoodOption("肥肉", "🍖", "processed", 395, 100),
+        // Common Chinese breakfast options. kcal/100 g are approximate and vary with recipe.
+        FoodOption("小米粥", "🥣", "whole", 46, 250),
+        FoodOption("牛奶", "🥛", "dairy", 61, 250),
+        FoodOption("鸡蛋灌饼", "🫓", "other", 235, 180),
+        FoodOption("小笼包", "🥟", "other", 225, 150),
+        FoodOption("馅饼", "🥮", "other", 250, 150)
     )
+    private val localBreakfastNames = listOf("小米粥", "牛奶", "鸡蛋灌饼", "小笼包", "馅饼")
+    fun localBreakfast(): List<FoodOption> = localBreakfastNames.mapNotNull { name -> all.find { it.name == name } }
+
     fun recommended(meal: MealType): List<FoodOption> {
         val names = when (meal) {
             MealType.BREAKFAST -> listOf("燕麦粥", "鸡蛋", "希腊酸奶", "水果", "全麦面包", "坚果", "蔬菜沙拉", "三文鱼", "橄榄油")
