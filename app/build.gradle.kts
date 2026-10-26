@@ -3,7 +3,33 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+// Signing material comes from local environment / GitHub Secrets and never from source.
+val stableSigningPath = System.getenv("JIANKANG_SIGNING_STORE_FILE").orEmpty()
+val stableSigningStorePassword = System.getenv("JIANKANG_SIGNING_STORE_PASSWORD").orEmpty()
+val stableSigningKeyPassword = System.getenv("JIANKANG_SIGNING_KEY_PASSWORD").orEmpty()
+val stableSigningAlias = System.getenv("JIANKANG_SIGNING_KEY_ALIAS").orEmpty()
+val stableSigningAvailable = listOf(
+    stableSigningPath, stableSigningStorePassword, stableSigningKeyPassword, stableSigningAlias
+).all { it.isNotBlank() }
+if (stableSigningPath.isNotBlank()) {
+    require(stableSigningAvailable) { "Stable signer requires all four environment variables" }
+    require(file(stableSigningPath).isFile) { "Missing stable signing keystore" }
+}
+
 android {
+    signingConfigs {
+        if (stableSigningAvailable) {
+            create("stableRelease") {
+                storeFile = file(stableSigningPath)
+                storePassword = stableSigningStorePassword
+                keyAlias = stableSigningAlias
+                keyPassword = stableSigningKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
     namespace = "com.jiankang.app"
     compileSdk = 36
 
@@ -11,13 +37,14 @@ android {
         applicationId = "com.jiankang.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (stableSigningAvailable) signingConfig = signingConfigs.getByName("stableRelease")
         }
     }
     compileOptions {
