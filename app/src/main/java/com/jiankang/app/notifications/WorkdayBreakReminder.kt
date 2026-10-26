@@ -94,6 +94,9 @@ object WorkdayBreakReminder {
         }
     }
 
+    /** Test only, directly called from an explicit user tap; no scheduled alarm. */
+    fun testVibration(context: Context) = vibrate(context)
+
     private fun vibrate(context: Context) {
         try {
             val vibrator = if (Build.VERSION.SDK_INT >= 31) {

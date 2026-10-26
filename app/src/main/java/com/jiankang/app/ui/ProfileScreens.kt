@@ -27,6 +27,8 @@ import com.jiankang.app.data.AppSettings
 import com.jiankang.app.data.HealthDatabase
 import com.jiankang.app.model.FoodCatalog
 import com.jiankang.app.notifications.ReminderScheduler
+import com.jiankang.app.notifications.WorkdayBreakReminder
+import com.jiankang.app.notifications.WorkdayBreakTimes
 import java.time.LocalDate
 import org.json.JSONObject
 
@@ -167,20 +169,54 @@ fun SportsScreen(onBack: () -> Unit) {
 @Composable
 fun RemindersScreen(settings: AppSettings, onBack: () -> Unit, settingsChanged: () -> Unit) {
     val context = LocalContext.current
-    var enabled by remember { mutableStateOf(settings.reminderEnabled) }
+    var dailyEnabled by remember { mutableStateOf(settings.reminderEnabled) }
     var selectedTime by remember {
-        mutableStateOf(String.format(java.util.Locale.ROOT, "%02d:%02d", settings.reminderHour, settings.reminderMinute))
+        mutableStateOf(String.format(java.util.Locale.ROOT, "%02d:%02d",
+            settings.reminderHour, settings.reminderMinute))
     }
-    val permissionLauncher = rememberLauncherForActivityResult(
+    var breaksEnabled by remember { mutableStateOf(settings.breakReminderEnabled) }
+    fun formatTime(minutes: Int) = String.format(
+        java.util.Locale.ROOT, "%02d:%02d", minutes / 60, minutes % 60
+    )
+    var breakStart by remember { mutableStateOf(formatTime(settings.breakStartMinutes)) }
+    var breakEnd by remember { mutableStateOf(formatTime(settings.breakEndMinutes)) }
+
+    val dailyPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            enabled = true
+            dailyEnabled = true
             settings.reminderEnabled = true
             ReminderScheduler.schedule(context, settings)
             settingsChanged()
-        } else showMessage(context, "未授予通知权限，提醒未开启")
+        } else showMessage(context, "没有通知权限，日记通知未开启")
     }
+    val breakPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        // Notification permission is optional for vibration; user explicitly enabled breaks.
+        breaksEnabled = true
+        settings.breakReminderEnabled = true
+        WorkdayBreakReminder.schedule(context, settings)
+        settingsChanged()
+        if (!granted) showMessage(context, "已开启振动提醒，但不会显示系统通知")
+    }
+
+    fun applyBreakWindow(newStart: String, newEnd: String) {
+        val from = java.time.LocalTime.parse(newStart)
+        val until = java.time.LocalTime.parse(newEnd)
+        if (!WorkdayBreakTimes.validWindow(from, until)) {
+            showMessage(context, "请设置同一天内超过1小时的工作时段")
+            return
+        }
+        breakStart = newStart
+        breakEnd = newEnd
+        settings.breakStartMinutes = from.hour * 60 + from.minute
+        settings.breakEndMinutes = until.hour * 60 + until.minute
+        WorkdayBreakReminder.schedule(context, settings)
+        settingsChanged()
+    }
+
     PageColumn("提醒设置", onBack = onBack) {
         AppCard {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -188,13 +224,13 @@ fun RemindersScreen(settings: AppSettings, onBack: () -> Unit, settingsChanged: 
                     Text("每天提醒记录", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     SmallLabel("每天提醒一次填写健康日记")
                 }
-                Switch(checked = enabled, onCheckedChange = { checked ->
+                Switch(checked = dailyEnabled, onCheckedChange = { checked ->
                     if (checked && Build.VERSION.SDK_INT >= 33 &&
                         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
                     ) {
-                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        dailyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                     } else {
-                        enabled = checked
+                        dailyEnabled = checked
                         settings.reminderEnabled = checked
                         ReminderScheduler.schedule(context, settings)
                         settingsChanged()
@@ -204,9 +240,9 @@ fun RemindersScreen(settings: AppSettings, onBack: () -> Unit, settingsChanged: 
             HorizontalDivider(color = Line)
             Row(
                 Modifier.fillMaxWidth().clickable {
-                    openTimePicker(context, selectedTime) {
-                        selectedTime = it
-                        val parts = it.split(":")
+                    openTimePicker(context, selectedTime) { next ->
+                        selectedTime = next
+                        val parts = next.split(":")
                         settings.reminderHour = parts[0].toInt()
                         settings.reminderMinute = parts[1].toInt()
                         ReminderScheduler.schedule(context, settings)
@@ -221,7 +257,79 @@ fun RemindersScreen(settings: AppSettings, onBack: () -> Unit, settingsChanged: 
                 Icon(Icons.Default.Schedule, "选择时间", tint = Slate)
             }
         }
-        SmallLabel("使用安卓系统每日提醒。为节省电量，系统可能延后通知；关闭提醒后不再发送。")
+
+        AppCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ColorIcon(Icons.Default.AccessibilityNew, Violet)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("工作日久坐振动提醒", fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold, color = Ink)
+                    SmallLabel("周一至周五，每坐满1小时提醒起身活动")
+                }
+                Switch(checked = breaksEnabled, onCheckedChange = { checked ->
+                    if (!checked) {
+                        breaksEnabled = false
+                        settings.breakReminderEnabled = false
+                        WorkdayBreakReminder.schedule(context, settings)
+                        settingsChanged()
+                    } else if (Build.VERSION.SDK_INT >= 33 &&
+                        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        breakPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        breaksEnabled = true
+                        settings.breakReminderEnabled = true
+                        WorkdayBreakReminder.schedule(context, settings)
+                        settingsChanged()
+                    }
+                })
+            }
+            Spacer(Modifier.height(9.dp))
+            HorizontalDivider(color = Line)
+            Row(
+                Modifier.fillMaxWidth().clickable {
+                    openTimePicker(context, breakStart) { applyBreakWindow(it, breakEnd) }
+                }.padding(vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("工作开始", fontSize = 14.sp, modifier = Modifier.weight(1f), color = Ink)
+                Text(breakStart, color = Green, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.Schedule, "设置开始时间", tint = Slate)
+            }
+            HorizontalDivider(color = Line)
+            Row(
+                Modifier.fillMaxWidth().clickable {
+                    openTimePicker(context, breakEnd) { applyBreakWindow(breakStart, it) }
+                }.padding(vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("工作结束", fontSize = 14.sp, modifier = Modifier.weight(1f), color = Ink)
+                Text(breakEnd, color = Green, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.Schedule, "设置结束时间", tint = Slate)
+            }
+            Spacer(Modifier.height(9.dp))
+            val startMinutes = settings.breakStartMinutes
+            val endMinutes = settings.breakEndMinutes
+            val first = startMinutes + 60
+            val last = startMinutes + 60 * ((endMinutes - startMinutes - 1) / 60)
+            SmallLabel(
+                "提醒时段：" + formatTime(first) + "—" + formatTime(last) +
+                    "（每小时，工作结束后不提醒）"
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(onClick = {
+                WorkdayBreakReminder.testVibration(context)
+                showMessage(context, "已发送测试振动（以手机振动设置为准）")
+            }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Vibration, null, modifier = Modifier.size(19.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("测试振动")
+            }
+        }
+        SmallLabel("久坐振动提醒默认关闭。系统省电、免打扰或静音模式可能延迟或抑制振动；通知权限被拒绝时仍可尝试振动，但不会弹出通知。不要求精确闹钟权限。")
     }
 }
 
@@ -242,6 +350,8 @@ fun BackupScreen(
                 put("screenGoalMinutes", settings.screenGoalMinutes)
                 put("screenLimitMode", settings.screenLimitMode)
                 put("screenAlertEnabled", settings.screenAlertEnabled)
+                put("breakStartMinutes", settings.breakStartMinutes)
+                put("breakEndMinutes", settings.breakEndMinutes)
                 put("favorites", org.json.JSONArray(settings.favorites().sorted()))
             })
             context.contentResolver.openOutputStream(uri)?.use {
@@ -287,6 +397,16 @@ fun BackupScreen(
                 // Imported alert settings are disabled until the user grants permissions again.
                 settings.screenAlertEnabled = false
                 com.jiankang.app.screentime.ScreenLimitScheduler.schedule(context, settings)
+                val restoredBreakStart = opt.optInt("breakStartMinutes", settings.breakStartMinutes).coerceIn(0, 1439)
+                val restoredBreakEnd = opt.optInt("breakEndMinutes", settings.breakEndMinutes).coerceIn(0, 1439)
+                if (WorkdayBreakTimes.validWindow(
+                        java.time.LocalTime.of(restoredBreakStart / 60, restoredBreakStart % 60),
+                        java.time.LocalTime.of(restoredBreakEnd / 60, restoredBreakEnd % 60))) {
+                    settings.breakStartMinutes = restoredBreakStart
+                    settings.breakEndMinutes = restoredBreakEnd
+                }
+                settings.breakReminderEnabled = false
+                WorkdayBreakReminder.schedule(context, settings)
                 val arr = opt.optJSONArray("favorites")
                 if (arr != null) {
                     val desired = (0 until arr.length()).map { arr.optString(it) }.toSet()
