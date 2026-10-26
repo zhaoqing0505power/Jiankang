@@ -38,7 +38,7 @@ fun HealthApp(resumeToken: Int = 0) {
     }
     LaunchedEffect(resumeToken) {
         ScreenLimitScheduler.maybeNotify(context.applicationContext, settings)
-        if (resumeToken == 0) WorkdayBreakReminder.schedule(context.applicationContext, settings)
+        WorkdayBreakReminder.schedule(context.applicationContext, settings)
     }
 
     val navigate: (Page) -> Unit = { dest ->

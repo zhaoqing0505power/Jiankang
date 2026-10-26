@@ -473,7 +473,7 @@ fun AboutScreen(onBack: () -> Unit) {
         AppCard {
             Text("🍃 健康日记", fontSize = 24.sp, color = DarkGreen, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(9.dp))
-            Text("版本 1.1.0", fontSize = 13.sp, color = Slate)
+            Text("版本 1.2.0", fontSize = 13.sp, color = Slate)
             Spacer(Modifier.height(12.dp))
             Text("让每天的饮食、起居和运动记录更简单。", color = Ink)
             Spacer(Modifier.height(8.dp))
