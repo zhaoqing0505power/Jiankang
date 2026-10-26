@@ -53,7 +53,7 @@ data class FoodOption(
 object FoodCatalog {
     val all = listOf(
         FoodOption("燕麦粥", "🥣", "whole", 71, 200),
-        FoodOption("鸡蛋", "🥚", "protein", 144, 60),
+        FoodOption("鸡蛋", "🥚", "protein", 144, 50),
         FoodOption("希腊酸奶", "🥛", "dairy", 100, 150),
         FoodOption("水果", "🍎", "fruit", 55, 150),
         FoodOption("全麦面包", "🍞", "whole", 247, 60),

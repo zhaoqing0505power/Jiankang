@@ -24,6 +24,7 @@ import com.jiankang.app.data.AppSettings
 import com.jiankang.app.data.HealthDatabase
 import com.jiankang.app.model.FoodCatalog
 import com.jiankang.app.model.FoodOption
+import com.jiankang.app.model.FoodPortions
 import com.jiankang.app.model.MealEntry
 import com.jiankang.app.model.MealType
 import java.time.LocalDate
@@ -118,7 +119,7 @@ fun MealScreen(
                     Text(item.emoji, fontSize = 26.sp, modifier = Modifier.width(43.dp))
                     Column(Modifier.weight(1f).clickable { editingIndex = idx }) {
                         Text(item.name, fontSize = 13.sp, color = Ink, fontWeight = FontWeight.SemiBold)
-                        SmallLabel(item.grams.toString() + "g", Slate)
+                        SmallLabel(FoodPortions.portionText(item), Slate)
                     }
                     Text(item.calories.toString() + " 千卡", fontSize = 12.sp, color = Ink)
                     IconButton(onClick = {
@@ -267,33 +268,109 @@ private fun FoodTile(food: FoodOption, modifier: Modifier, click: () -> Unit) {
 @Composable
 private fun EditPortionDialog(entry: MealEntry, dismiss: () -> Unit, confirm: (MealEntry) -> Unit) {
     val context = LocalContext.current
-    var grams by remember(entry) { mutableStateOf(entry.grams.toString()) }
+    val isEgg = FoodPortions.countable(entry.name)
+    // Historical egg records may be 60g; keep gram-mode until the user chooses "个".
+    var useCount by remember(entry) {
+        mutableStateOf(isEgg && entry.grams % FoodPortions.EGG_GRAMS == 0)
+    }
+    var amount by remember(entry) {
+        mutableStateOf(
+            if (isEgg && entry.grams % FoodPortions.EGG_GRAMS == 0)
+                (entry.grams / FoodPortions.EGG_GRAMS).toString()
+            else entry.grams.toString()
+        )
+    }
     var calories by remember(entry) { mutableStateOf(entry.calories.toString()) }
+    var energyPerGram by remember(entry) {
+        mutableDoubleStateOf(entry.calories.toDouble() / entry.grams.coerceAtLeast(1))
+    }
+
+    fun gramsFor(raw: String, asCount: Boolean): Int? {
+        val number = raw.toIntOrNull() ?: return null
+        if (number !in 1..10000) return null
+        return if (asCount) {
+            if (number > 200) null else FoodPortions.eggGrams(number)
+        } else number
+    }
+
+    fun setQuantity(input: String) {
+        amount = input.filter(Char::isDigit).take(if (useCount) 3 else 5)
+        gramsFor(amount, useCount)?.let { grams ->
+            calories = (energyPerGram * grams).roundToInt().coerceIn(0, 100000).toString()
+        }
+    }
+
+    fun switchUnit(asCount: Boolean) {
+        val previousGrams = gramsFor(amount, useCount) ?: entry.grams
+        useCount = asCount
+        val next = if (asCount)
+            (previousGrams.toDouble() / FoodPortions.EGG_GRAMS).roundToInt().coerceAtLeast(1)
+                .coerceAtMost(200)
+        else previousGrams
+        setQuantity(next.toString())
+    }
+
     AlertDialog(
-        onDismissRequest = dismiss, title = { Text("修改份量 · " + entry.name) },
+        onDismissRequest = dismiss,
+        title = { Text("修改份量 · " + entry.name) },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                if (isEgg) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterPill("按个数", useCount, Modifier.weight(1f)) { switchUnit(true) }
+                        FilterPill("按克数", !useCount, Modifier.weight(1f)) { switchUnit(false) }
+                    }
+                }
                 OutlinedTextField(
-                    grams, { grams = it.filter(Char::isDigit).take(5) },
-                    label = { Text("重量（克）") }, singleLine = true,
+                    value = amount, onValueChange = ::setQuantity,
+                    label = { Text(if (useCount) "数量（个）" else "重量（克）") },
+                    suffix = { Text(if (useCount) "个" else "g") },
+                    singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
-                Spacer(Modifier.height(10.dp))
+                if (useCount) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            onClick = {
+                                val n = amount.toIntOrNull() ?: 1
+                                if (n > 1) setQuantity((n - 1).toString())
+                            }
+                        ) { Icon(Icons.Default.Remove, "减一个") }
+                        Spacer(Modifier.weight(1f))
+                        SmallLabel("1个鸡蛋约50克")
+                        Spacer(Modifier.weight(1f))
+                        OutlinedButton(
+                            onClick = {
+                                val n = amount.toIntOrNull() ?: 0
+                                if (n < 200) setQuantity((n + 1).toString())
+                            }
+                        ) { Icon(Icons.Default.Add, "加一个") }
+                    }
+                }
                 OutlinedTextField(
-                    calories, { calories = it.filter(Char::isDigit).take(6) },
-                    label = { Text("估算热量（千卡）") }, singleLine = true,
+                    value = calories,
+                    onValueChange = { input ->
+                        calories = input.filter(Char::isDigit).take(6)
+                        val weight = gramsFor(amount, useCount)
+                        val kcal = calories.toIntOrNull()
+                        if (weight != null && kcal != null && kcal in 0..100000)
+                            energyPerGram = kcal.toDouble() / weight
+                    },
+                    label = { Text("估算热量（千卡）") },
+                    supportingText = { Text("改变数量会自动重新计算，热量也可手动修正。", fontSize = 11.sp) },
+                    singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                val g = grams.toIntOrNull()
-                val k = calories.toIntOrNull()
-                if (g == null || g !in 1..10000 || k == null || k !in 0..100000)
-                    showMessage(context, "请输入有效重量和热量")
-                else confirm(entry.copy(grams = g, calories = k))
-            }) { Text("确定") }
+                val grams = gramsFor(amount, useCount)
+                val kcal = calories.toIntOrNull()
+                if (grams == null || kcal == null || kcal !in 0..100000)
+                    showMessage(context, "请输入有效数量和热量")
+                else confirm(entry.copy(grams = grams, calories = kcal))
+            }) { Text("保存") }
         },
         dismissButton = { TextButton(onClick = dismiss) { Text("取消") } }
     )
