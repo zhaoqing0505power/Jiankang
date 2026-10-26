@@ -3,6 +3,8 @@ package com.jiankang.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.imageResource
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -184,6 +186,28 @@ private fun FilterPill(label: String, selected: Boolean, modifier: Modifier, cli
     }
 }
 
+
+private fun foodAtlasIndex(name: String): Int? = when (name) {
+    "燕麦粥" -> 0
+    "鸡蛋" -> 1
+    "希腊酸奶", "奶酪" -> 2
+    "水果" -> 3
+    "全麦面包" -> 4
+    "坚果" -> 5
+    "蔬菜沙拉" -> 6
+    "三文鱼" -> 7
+    "橄榄油" -> 8
+    "糙米/全谷物" -> 9
+    "蔬菜" -> 10
+    "鱼类" -> 11
+    "鸡胸肉" -> 11
+    "豆类" -> 13
+    "西红柿" -> 15
+    "绿叶菜" -> 16
+    "牛油果" -> 17
+    else -> null
+}
+
 @Composable
 private fun FoodTile(food: FoodOption, modifier: Modifier, click: () -> Unit) {
     Surface(
@@ -199,7 +223,31 @@ private fun FoodTile(food: FoodOption, modifier: Modifier, click: () -> Unit) {
                 Modifier.fillMaxWidth().height(55.dp).background(Pale, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(food.emoji, fontSize = 37.sp)
+                val tileIndex = foodAtlasIndex(food.name)
+                if (tileIndex != null) {
+                    val atlas = androidx.compose.ui.graphics.ImageBitmap.imageResource(
+                        com.jiankang.app.R.drawable.food_atlas
+                    )
+                    androidx.compose.foundation.Canvas(
+                        Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+                    ) {
+                        val width = atlas.width / 3
+                        val height = atlas.height / 6
+                        drawImage(
+                            image = atlas,
+                            srcOffset = androidx.compose.ui.unit.IntOffset(
+                                tileIndex % 3 * width, tileIndex / 3 * height
+                            ),
+                            srcSize = androidx.compose.ui.unit.IntSize(width, height),
+                            dstOffset = androidx.compose.ui.unit.IntOffset.Zero,
+                            dstSize = androidx.compose.ui.unit.IntSize(
+                                size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)
+                            )
+                        )
+                    }
+                } else {
+                    Text(food.emoji, fontSize = 37.sp)
+                }
             }
             Spacer(Modifier.height(5.dp))
             Text(
