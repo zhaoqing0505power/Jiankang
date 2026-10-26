@@ -186,9 +186,7 @@ fun ProgressTrack(progress: Float, color: Color = Green) {
         progress = { progress.coerceIn(0f, 1f) },
         modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
         color = color,
-        trackColor = Line,
-        gapSize = 0.dp,
-        drawStopIndicator = {}
+        trackColor = Line
     )
 }
 
