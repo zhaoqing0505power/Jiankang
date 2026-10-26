@@ -73,6 +73,20 @@ jobs:
             exit 1
           fi
           echo "Stable release certificate verified: $ACTUAL"
+      - name: Collect unsigned APK and official signing tool for private offline signing
+        if: github.event_name != 'pull_request' && env.JIANKANG_SIGNING_STORE_FILE == ''
+        run: |
+          set -euo pipefail
+          mkdir -p build/private-signing-input
+          cp app/build/outputs/apk/release/app-release-unsigned.apk build/private-signing-input/
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" build/private-signing-input/
+      - name: Upload unsigned APK (not installable)
+        if: github.event_name != 'pull_request' && env.JIANKANG_SIGNING_STORE_FILE == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jiankang-unsigned-for-private-signing-only
+          path: build/private-signing-input/*
+          retention-days: 1
       - uses: actions/upload-artifact@v4
         if: success()
         with:
