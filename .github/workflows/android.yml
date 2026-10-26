@@ -22,8 +22,12 @@ jobs:
           java-version: '17'
       - name: Install Android SDK platform
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+          SDK_ROOT="$ANDROID_HOME"
+          if [ -z "$SDK_ROOT" ]; then SDK_ROOT=/usr/local/lib/android/sdk; fi
+          SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n 1)
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
