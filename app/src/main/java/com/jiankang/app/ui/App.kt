@@ -12,6 +12,7 @@ import com.jiankang.app.model.MealType
 import java.time.LocalDate
 import com.jiankang.app.screentime.ScreenTimeReader
 import com.jiankang.app.screentime.ScreenLimitScheduler
+import com.jiankang.app.notifications.WorkdayBreakReminder
 
 enum class Page(val isTab: Boolean = false) {
     HOME(true), RECORD(true), STATS(true), PROFILE(true),
@@ -35,7 +36,10 @@ fun HealthApp(resumeToken: Int = 0) {
     val screenUsage = remember(dayString, page, resumeToken, revision) {
         ScreenTimeReader.read(context.applicationContext, date)
     }
-    LaunchedEffect(resumeToken) { ScreenLimitScheduler.maybeNotify(context.applicationContext, settings) }
+    LaunchedEffect(resumeToken) {
+        ScreenLimitScheduler.maybeNotify(context.applicationContext, settings)
+        if (resumeToken == 0) WorkdayBreakReminder.schedule(context.applicationContext, settings)
+    }
 
     val navigate: (Page) -> Unit = { dest ->
         if (page != dest) {

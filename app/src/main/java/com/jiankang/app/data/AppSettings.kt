@@ -25,6 +25,19 @@ class AppSettings(context: Context) {
         get() = prefs.getInt("reminder_minute", 0)
         set(value) { prefs.edit().putInt("reminder_minute", value.coerceIn(0, 59)).apply() }
 
+    /** All workday break alerts are opt-in. Local wall-clock time, [start,end). */
+    var breakReminderEnabled: Boolean
+        get() = prefs.getBoolean("break_reminders_enabled", false)
+        set(value) { prefs.edit().putBoolean("break_reminders_enabled", value).apply() }
+
+    var breakStartMinutes: Int
+        get() = prefs.getInt("break_start_minutes", 8 * 60)
+        set(value) { prefs.edit().putInt("break_start_minutes", value.coerceIn(0, 1439)).apply() }
+
+    var breakEndMinutes: Int
+        get() = prefs.getInt("break_end_minutes", 17 * 60)
+        set(value) { prefs.edit().putInt("break_end_minutes", value.coerceIn(0, 1439)).apply() }
+
     /** Total interactive screen-time goal, in minutes, default five hours. */
     var screenGoalMinutes: Int
         get() = prefs.getInt("screen_goal_minutes", 300)
