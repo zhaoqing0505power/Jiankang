@@ -43,3 +43,15 @@ Android Studio + Java 17，Gradle 8.13，Android SDK API 36。
 6. 周/月/年无记录日期保留空白。
 7. JSON导出再导入可以恢复记录，CSV可以在Excel查看。
 8. 设置通知后重新启动设备，提醒恢复。
+
+## v1.1 升级与技术边界
+
+- SQLite schema version 2，`days` 新增 `reflection`、`mood` 两列，升级使用 `ALTER TABLE`，保留原有数据。
+- 身高预填使用 `SELECT height_cm FROM days WHERE date < ? ... ORDER BY date DESC LIMIT 1`，不从未来日期倒灌，也不伪造当天测量记录。
+- 首页七项进度记录中新增感悟。日记、心情与所有其他健康信息均保留在 SQLite 本地数据库。
+- 早餐 `家常早餐` 和 `地中海饮食` 独立分组，搜索所有食品，营养评分中家常早餐不会自动被判断为不健康。
+- Android 9+ 系统屏幕交互事件由 `UsageStatsManager.queryEvents` 读取：`SCREEN_INTERACTIVE` / `SCREEN_NON_INTERACTIVE`。先获得由用户自行打开的“使用情况访问权限”；从前一天检索事件建立跨午夜边界状态，缺失边界会标注部分统计，缺失事件时不以 0 代替。
+- 手机屏幕时间不等同于解锁次数；Android 8 及以下不支持上述事件。阈值提醒需用户独立授予 Android 13+ 通知权限，系统可延迟闹钟执行。
+- 手机限制模式只会提醒并提供系统设置入口。无法静默设置系统数字健康应用限时，无法强行阻止解锁手机。
+- 防癌、心脑血管知识为离线卡片，来源 WHO、AHA、CDC 的官方公共资料，提供跳转原文，内容不做病症诊断。
+- 构建验收：`gradle :app:testDebugUnitTest :app:assembleDebug`；除单元测试外还应在真实安卓手机验证数据迁移、通知与亮屏授权。

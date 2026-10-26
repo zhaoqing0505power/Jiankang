@@ -239,6 +239,9 @@ fun BackupScreen(
             json.put("settings", JSONObject().apply {
                 put("sleepGoalHours", settings.sleepGoalHours)
                 put("weeklyExerciseGoal", settings.weeklyExerciseGoal)
+                put("screenGoalMinutes", settings.screenGoalMinutes)
+                put("screenLimitMode", settings.screenLimitMode)
+                put("screenAlertEnabled", settings.screenAlertEnabled)
                 put("favorites", org.json.JSONArray(settings.favorites().sorted()))
             })
             context.contentResolver.openOutputStream(uri)?.use {
@@ -278,6 +281,12 @@ fun BackupScreen(
             if (opt != null) {
                 settings.sleepGoalHours = opt.optInt("sleepGoalHours", settings.sleepGoalHours)
                 settings.weeklyExerciseGoal = opt.optInt("weeklyExerciseGoal", settings.weeklyExerciseGoal)
+                settings.screenGoalMinutes = opt.optInt("screenGoalMinutes", settings.screenGoalMinutes)
+                settings.screenLimitMode = opt.optString("screenLimitMode", settings.screenLimitMode)
+                    .takeIf { it == "remind" || it == "focus" } ?: "focus"
+                // Imported alert settings are disabled until the user grants permissions again.
+                settings.screenAlertEnabled = false
+                com.jiankang.app.screentime.ScreenLimitScheduler.schedule(context, settings)
                 val arr = opt.optJSONArray("favorites")
                 if (arr != null) {
                     val desired = (0 until arr.length()).map { arr.optString(it) }.toSet()
@@ -293,7 +302,7 @@ fun BackupScreen(
         AppCard {
             SectionHeading("备份健康日记")
             Spacer(Modifier.height(8.dp))
-            SmallLabel("导出JSON备份，可在换手机后导入，包含体征、三餐、睡眠、运动及目标。")
+            SmallLabel("导出JSON备份，可在换手机后导入，包含体征、三餐、睡眠、运动、感悟及目标。")
             Spacer(Modifier.height(12.dp))
             PrimaryButton("导出完整备份（JSON）") {
                 exportJson.launch("Jiankang-backup-" + LocalDate.now() + ".json")
@@ -302,7 +311,7 @@ fun BackupScreen(
         AppCard {
             SectionHeading("导出表格")
             Spacer(Modifier.height(8.dp))
-            SmallLabel("CSV包含每日测量与记录，可用Excel打开。")
+            SmallLabel("CSV包含每日测量、心情及感悟，可用Excel打开。")
             Spacer(Modifier.height(12.dp))
             PrimaryButton("导出CSV表格") {
                 exportCsv.launch("Jiankang-records-" + LocalDate.now() + ".csv")

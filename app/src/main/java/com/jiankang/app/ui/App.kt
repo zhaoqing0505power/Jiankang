@@ -32,7 +32,7 @@ fun HealthApp(resumeToken: Int = 0) {
     val day = remember(dayString, revision) { db.day(dayString) }
     val meals = remember(dayString, revision) { db.meals(dayString) }
     val previousHeight = remember(dayString, revision) { db.latestHeightBefore(dayString) }
-    val screenUsage = remember(dayString, page, resumeToken) {
+    val screenUsage = remember(dayString, page, resumeToken, revision) {
         ScreenTimeReader.read(context.applicationContext, date)
     }
     LaunchedEffect(resumeToken) { ScreenLimitScheduler.maybeNotify(context.applicationContext, settings) }
