@@ -205,8 +205,8 @@ fun MetricValue(label: String, value: String, modifier: Modifier = Modifier) {
 fun SettingRow(
     icon: ImageVector,
     title: String,
-    onClick: () -> Unit,
-    subtitle: String? = null
+    subtitle: String? = null,
+    onClick: () -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 48.dp),

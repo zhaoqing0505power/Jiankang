@@ -138,6 +138,7 @@ class HealthDatabase(context: Context) : SQLiteOpenHelper(context, "jiankang.db"
         val db = writableDatabase
         db.beginTransaction()
         try {
+            putDay(db, day(date))
             db.delete("meals", "date=? AND meal=?", arrayOf(date, meal.code))
             entries.forEach { item -> putMeal(db, item.copy(date = date, meal = meal.code)) }
             db.setTransactionSuccessful()

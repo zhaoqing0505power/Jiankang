@@ -63,7 +63,7 @@ private data class PlotSeries(val label: String, val values: List<Double?>, val 
 
 private fun plotValues(
     days: List<DayRecord>, ticks: List<LocalDate>, period: String,
-    selector: (DayRecord) -> Double?, aggregateSum: Boolean = false
+    aggregateSum: Boolean = false, selector: (DayRecord) -> Double?
 ): List<Double?> {
     val daily = days.associateBy { it.date }
     if (period != "年") return ticks.map { daily[it.toString()]?.let(selector) }

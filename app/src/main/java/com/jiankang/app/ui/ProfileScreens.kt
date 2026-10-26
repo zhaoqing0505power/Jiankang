@@ -257,13 +257,16 @@ fun BackupScreen(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) try {
-            val bytes = context.contentResolver.openInputStream(uri)?.use {
-                val buffer = ByteArray(12_000_001)
-                val count = it.read(buffer)
-                if (count < 0) error("文件为空")
-                val extra = it.read()
-                if (extra != -1) error("备份文件过大")
-                buffer.copyOf(count)
+            val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
+                val result = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val n = stream.read(buffer)
+                    if (n < 0) break
+                    if (result.size() + n > 12_000_000) error("备份文件过大")
+                    result.write(buffer, 0, n)
+                }
+                result.toByteArray()
             } ?: error("无法打开备份")
             val json = JSONObject(String(bytes, Charsets.UTF_8))
             db.importJson(json.toString())
