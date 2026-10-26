@@ -17,18 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
 
-private data class DailyQuote(val text: String, val attribution: String)
-
-private val quotes = listOf(
-    DailyQuote("不以物喜，不以己悲。", "范仲淹《岳阳楼记》"),
-    DailyQuote("知足者富。", "《道德经》第三十三章"),
-    DailyQuote("君子坦荡荡，小人长戚戚。", "《论语·述而》"),
-    DailyQuote("天行健，君子以自强不息。", "《周易·乾》"),
-    DailyQuote("流水不腐，户枢不蠹。", "《吕氏春秋·尽数》"),
-    DailyQuote("岁寒，然后知松柏之后凋也。", "《论语·子罕》"),
-    DailyQuote("三人行，必有我师焉。", "《论语·述而》")
-)
-
 private data class HealthEvidence(
     val title: String,
     val lead: String,
@@ -96,46 +84,8 @@ private val evidences = listOf(
     )
 )
 
-private fun quoteFor(date: LocalDate): DailyQuote =
-    quotes[Math.floorMod(date.toEpochDay(), quotes.size.toLong()).toInt()]
-
 private fun tipFor(date: LocalDate): HealthEvidence =
     evidences[Math.floorMod(date.toEpochDay(), evidences.size.toLong()).toInt()]
-
-@Composable
-fun DailyQuoteCard(date: LocalDate) {
-    val quote = quoteFor(date)
-    AppCard(background = Color(0xFFFFF7E9)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.WbSunny, null, tint = Orange)
-            Spacer(Modifier.width(9.dp))
-            Text("每日一句", fontWeight = FontWeight.Bold, color = Ink)
-        }
-        Spacer(Modifier.height(10.dp))
-        Text("“" + quote.text + "”", fontSize = 15.sp, color = Ink, lineHeight = 22.sp)
-        Spacer(Modifier.height(6.dp))
-        Text("—— " + quote.attribution, fontSize = 11.sp, color = Slate)
-    }
-}
-
-@Composable
-fun DailyHealthCard(date: LocalDate, onOpen: () -> Unit) {
-    val tip = tipFor(date)
-    AppCard(modifier = Modifier.clickable(onClick = onOpen)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ColorIcon(Icons.Default.Favorite, Coral)
-            Spacer(Modifier.width(11.dp))
-            Text("今日健康知识", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, null, tint = Slate)
-        }
-        Spacer(Modifier.height(10.dp))
-        Text(tip.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = DarkGreen)
-        Spacer(Modifier.height(6.dp))
-        Text(tip.lead, fontSize = 12.sp, lineHeight = 18.sp, color = Slate, maxLines = 4)
-        Spacer(Modifier.height(7.dp))
-        SmallLabel("来源：" + tip.source)
-    }
-}
 
 @Composable
 fun HealthGuideScreen(date: LocalDate, onBack: () -> Unit) {

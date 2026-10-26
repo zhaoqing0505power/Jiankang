@@ -132,8 +132,6 @@ fun HomeScreen(
                 }
             }
         }
-        DailyQuoteCard(date)
-        DailyHealthCard(date) { go(Page.HEALTH_GUIDE) }
         ScreenTimeSummaryCard(date, screenUsage, settings) { go(Page.SCREEN_TIME) }
     }
 }
